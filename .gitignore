@@ -1,0 +1,6 @@
+build/
+build-mcuboot/
+firmware.bin
+firmware.crc
+QWEN.md
+firmware.rcc
