@@ -11,6 +11,6 @@ set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
 
 generate_inc_file_for_target(
     app
-    src/r1.der
-    ${gen_dir}/r1.der.inc
-    )
+    src/root_ca.der
+    ${gen_dir}/root_ca.der.inc
+)

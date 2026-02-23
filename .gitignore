@@ -4,3 +4,4 @@ firmware.bin
 firmware.crc
 QWEN.md
 firmware.rcc
+mcuboot.pem

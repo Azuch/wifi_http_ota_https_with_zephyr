@@ -1,0 +1,6 @@
+--2026-02-23 19:49:06--  http://release-assets.githubusercontent.com/
+Resolving release-assets.githubusercontent.com (release-assets.githubusercontent.com)... 185.199.108.133, 185.199.109.133, 185.199.110.133, ...
+Connecting to release-assets.githubusercontent.com (release-assets.githubusercontent.com)|185.199.108.133|:80... connected.
+HTTP request sent, awaiting response... 404 Not Found
+2026-02-23 19:49:06 ERROR 404: Not Found.
+

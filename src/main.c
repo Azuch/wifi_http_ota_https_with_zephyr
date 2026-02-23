@@ -15,7 +15,6 @@
 #include <zephyr/net/http/client.h>
 #include <zephyr/net/tls_credentials.h>
 
-
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
 
@@ -33,7 +32,7 @@ LOG_MODULE_REGISTER(HTTP_WIFI, LOG_LEVEL_INF);
 #define PSK "9876543210"
 #define TLS_SEC_TAG 42
 
-#define TLS_PEER_HOSTNAME "www.google.com"
+#define TLS_PEER_HOSTNAME "release-assets.githubusercontent.com"
 #define HOSTNAME "192.168.0.189"
 #define PORT "443"
 #define URL "/firmware.bin"
@@ -41,7 +40,7 @@ LOG_MODULE_REGISTER(HTTP_WIFI, LOG_LEVEL_INF);
 /* Flash partition - use image-1 for OTA firmware (1.3MB) */
 #define DOWNLOAD_PARTITION_ID FIXED_PARTITION_ID(slot1_partition)
 
-static uint8_t write_buffer[4096];
+static uint8_t write_buffer[8192];
 static size_t buffer_offset = 0;
 static bool flash_ready = false;
 static size_t bytes_written = 0;
@@ -56,7 +55,7 @@ static bool wifi_connected = false;
 static bool use_flash = false;
 static bool upgrade = false;
 static bool test_https = true;
-static uint8_t buffer[4096];  /* Larger buffer for firmware download */
+static uint8_t buffer[8192];  /* Larger buffer for firmware download */
 static int send_req(const char *hostname, const char *port, const char *url, http_response_cb_t callback);
 
 /* Flash write state */
@@ -195,6 +194,21 @@ static int http_response_flash_cb(struct http_response *rsp,
 	return 0;
 }
 
+
+static int load_tls_credentials(void) {
+	int ret;
+
+	ret = tls_credential_add(TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE,
+				 ca_certificate, sizeof(ca_certificate));
+	if (ret < 0) {
+		LOG_ERR("Failed to register CA certificate: %d", ret);
+		return ret;
+	}
+
+	LOG_INF("TLS credentials loaded (%zu bytes)", sizeof(ca_certificate));
+	return 0;
+}
+
 static int http_response_ram_cb (struct http_response *rsp,
                                 enum http_final_call final_call,
  				void *user_data) {
@@ -257,32 +271,21 @@ static void request_boot_upgrade(void) {
 }
 
 
-static int load_tls_credentials(void) {
-	int ret;
-
-	ret = tls_credential_add(TLS_SEC_TAG, TLS_CREDENTIAL_CA_CERTIFICATE,
-				 ca_certificate, sizeof(ca_certificate));
-	if (ret < 0) {
-		LOG_ERR("Failed to register CA certificate: %d", ret);
-		return ret;
-	}
-
-	LOG_INF("TLS credentials loaded (%zu bytes)", sizeof(ca_certificate));
-	return 0;
-}
-
 static int https_cb(struct http_response *rsp,
-		enum http_final_call final_call,
-		void *user_data) {
-	if (final_call == HTTP_DATA_MORE) {
-		LOG_INF("[%u] Partial received: %u bytes", rsp->http_status_code, rsp->data_len);
-	}
-	if (final_call == HTTP_DATA_FINAL) {
-		LOG_INF("[%u] All data downloaded.", rsp->http_status_code);
-	}
-	return 0;
-}
+                    enum http_final_call final_call,
+                    void *user_data)
+{
+    if (rsp->body_frag_len > 0) {
+        LOG_INF("Fragment received: %d bytes",
+                rsp->body_frag_len);
+    }
 
+    if (final_call == HTTP_DATA_FINAL) {
+        LOG_INF("Download complete");
+    }
+
+    return 0;
+}
 static int send_https_req(void) {
 	int ret;
 	int sock = -1;
@@ -363,7 +366,7 @@ static int send_https_req(void) {
         req.method = HTTP_GET;
         req.host = host_with_port;
         req.protocol = "HTTP/1.1";
-        req.url = "/";
+        req.url = "/github-production-release-asset/1163825255/9589cb09-ec22-4aee-9631-e8f271a303dd?sp=r&sv=2018-11-09&sr=b&spr=https&se=2026-02-23T13%3A49%3A05Z&rscd=attachment%3B+filename%3Dfirmware.bin&rsct=application%2Foctet-stream&skoid=96c2d410-5711-43a1-aedd-ab1947aa7ab0&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skt=2026-02-23T12%3A48%3A48Z&ske=2026-02-23T13%3A49%3A05Z&sks=b&skv=2018-11-09&sig=xcEXkNSS8SZ3JoMlJl2QVRkNT68eTIDeA5gTGzt5XEc%3D&jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmVsZWFzZS1hc3NldHMuZ2l0aHVidXNlcmNvbnRlbnQuY29tIiwia2V5Ijoia2V5MSIsImV4cCI6MTc3MTg1MTQzNSwibmJmIjoxNzcxODUxMTM1LCJwYXRoIjoicmVsZWFzZWFzc2V0cHJvZHVjdGlvbi5ibG9iLmNvcmUud2luZG93cy5uZXQifQ.hiMlWu5peYQeHfjJnlnquvSHIW3MA_c6nBBKUcpFeZ4&response-content-disposition=attachment%3B%20filename%3Dfirmware.bin&response-content-type=application%2Foctet-stream";
         req.response = https_cb;
         req.recv_buf = buffer;
         req.recv_buf_len = sizeof(buffer);
@@ -391,9 +394,9 @@ int main(void) {
 	// Wait a bit for network to be fully ready
 	k_sleep(K_SECONDS(3));
 
-	// Load TLS credentials before any HTTPS
 	load_tls_credentials();
 
+	// Load TLS credentials before any HTTPS
 	if (upgrade) {
 		LOG_INF("Hi, this is version 1 and i want upgrade");
 		prepare_flash();
@@ -472,7 +475,7 @@ static int send_req(const char *hostname, const char *port, const char *url, htt
 	close(sock);
 	freeaddrinfo(res);
 
-	LOG_INF("What the hell! For real? I went to this step? Holly shiiiit.\nUhm, i mean Firmware ready for update);
+	LOG_INF("What the hell! For real? I went to this step? Holly shiiiit.\nUhm, i mean Firmware ready for update");
 
 	return 0;
 }
